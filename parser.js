@@ -67,8 +67,38 @@ function inspectFiles(files){
   if(/\/definition\.pbism$/.test(p)){result.metadata.semanticModel.version=j.version||''}
   if(/\/definition\.pbir$/.test(p)){result.metadata.report.datasetReference=j.datasetReference||{};result.metadata.report.version=j.version||''}
  }
- for(const f of parsed.filter(x=>x.type==='tmdl')){if(/\/definition\/(?:tables\/|relationships\.tmdl$)/i.test(f.name)){parseTmdl(result,f.text,f.name);modelFormat=true}else if(/\/definition\/model\.tmdl$/i.test(f.name)){for(const key of ['culture','discourageImplicitMeasures','defaultPowerBIDataSourceVersion']){const m=f.text.match(new RegExp('^\\s*'+key+'\\s*:\\s*(.+)
-</body></html>
+ for(const f of parsed.filter(x=>x.type==='tmdl')){if(/\/definition\/(?:tables\/|relationships\.tmdl$)/i.test(f.name)){parseTmdl(result,f.text,f.name);modelFormat=true}else if(/\/definition\/model\.tmdl$/i.test(f.name)){for(const key of ['culture','discourageImplicitMeasures','defaultPowerBIDataSourceVersion']){const m=f.text.match(new RegExp('^\\s*'+key+'\\s*:\\s*(.+)));if(m)result.metadata.semanticModel[key]=m[1]};modelFormat=true}}
+ for(const [id,page] of pageMap){page.ordinal=(pageOrder.indexOf(id)>=0?pageOrder.indexOf(id):1000+page.ordinal);result.pages.push(page)}result.pages.sort((a,b)=>a.ordinal-b.ordinal);
+ for(const v of result.visuals){const p=pageMap.get(v.pageId)||result.pages.find(x=>x.id===v.pageId);if(p){v.page=p.name;p.visualCount++}else v.page=v.page||v.pageId||'Unmapped page'}
+ // Model .bim often has a .json extension in extracted Fabric item definitions.
+ if(!modelFormat){for(const f of parsed.filter(x=>x.type==='json'&&x.obj?.model&&Array.isArray(x.obj.model.tables))){parseModelJson(result,f.obj,f.name);modelFormat=true;break}}
+ result.format=reportFormat?(result.format==='PBIR Legacy'?'PBIR Legacy':'Enhanced PBIR'):modelFormat?'Semantic model only':'Project metadata';
+ const id=x=>JSON.stringify(x);for(const category of ['tables','columns','relationships','bookmarks']){const seen=new Set();result[category]=result[category].filter(x=>{const key=category==='tables'?x.name:category==='columns'?x.table+'.'+x.name:category==='relationships'?`${x.name}|${x.from}|${x.to}`:x.id;if(seen.has(key))return false;seen.add(key);return true})}
+ if(result.visuals.length&&!result.pages.length)result.issues.push('Visuals were found, but no matching page definitions were loaded. Upload the full project.');
+ if(result.pages.length&&!modelFormat)result.issues.push('No semantic model definition was found. Tables, model measures and relationships may be unavailable. Include the .SemanticModel folder.');
+ if(result.tables.length&&!reportFormat)result.issues.push('No report definition found. Include the .Report folder to inspect report pages, visuals, filters and bookmarks.');
+ if(!result.pages.length&&!result.tables.length&&!result.visuals.length)result.issues.push('Files were read, but no recognised report or semantic model objects were found.');
+ result.metadata.semanticModelAvailable=modelFormat;result.metadata.reportAvailable=reportFormat;
+ for(const [label,collection] of [['Report',result.metadata.report],['Semantic model',result.metadata.semanticModel]])for(const [name,value] of Object.entries(collection))if(value!==undefined&&value!==null&&value!=='')result.metadataEntries.push({name:`${label}: ${name}`,value,scope:label});
+ result.metadataEntries.push({name:'Input file inventory',value:result.files,scope:'Project'});
+ return result;
+}
+function demoFiles(){const enc=new TextEncoder(),files={
+ 'Retail.pbip':'{"version":"1.0"}',
+ 'Retail.Report/definition/pages/pages.json':JSON.stringify({pageOrder:['overview','trends'],activePageName:'overview'}),
+ 'Retail.Report/definition/pages/overview/page.json':JSON.stringify({name:'overview',displayName:'Sales overview',width:1280,height:720,filterConfig:{filters:[{name:'Region filter',type:'Categorical'}]}}),
+ 'Retail.Report/definition/pages/trends/page.json':JSON.stringify({name:'trends',displayName:'Monthly trends'}),
+ 'Retail.Report/definition/report.json':JSON.stringify({themeCollection:{baseTheme:{name:'Mightora Retail Demo'}},filterConfig:{filters:[{name:'Active customers',type:'Advanced'}]}}),
+ 'Retail.Report/definition/pages/overview/visuals/kpi/visual.json':JSON.stringify({name:'kpi',position:{x:35,y:30,width:360,height:200},visual:{visualType:'card',query:{queryState:{Data:{projections:[{field:{Measure:{Expression:{SourceRef:{Entity:'Sales'}},Property:'Total Revenue'}},queryRef:'Sales.Total Revenue'}]}}}}}),
+ 'Retail.Report/definition/pages/overview/visuals/bar/visual.json':JSON.stringify({name:'bar',position:{x:40,y:270,width:550,height:330},visual:{visualType:'barChart',query:{queryState:{Category:{projections:[{queryRef:'Products.Category'}]},Y:{projections:[{queryRef:'Sales.Total Revenue'}]}}}}}),
+ 'Retail.Report/definition/pages/trends/visuals/line/visual.json':JSON.stringify({name:'line',position:{x:40,y:50,width:800,height:400},visual:{visualType:'lineChart',query:{queryState:{Category:{projections:[{queryRef:'Calendar.Month'}]},Y:{projections:[{queryRef:'Sales.Total Revenue'}]}}}}}),
+ 'Retail.Report/definition/bookmarks/presentation.bookmark.json':JSON.stringify({name:'presentation',displayName:'Presentation view'}),
+ 'Retail.Report/definition/reportExtensions.json':JSON.stringify({entities:[{name:'Sales',measures:[{name:'Revenue Label',expression:'"Revenue: " & FORMAT([Total Revenue], "£#,##0")'}]}]}),
+ 'Retail.SemanticModel/definition/tables/Sales.tmdl':"table Sales\n\tcolumn OrderId\n\t\tdataType: int64\n\tcolumn Revenue\n\t\tdataType: decimal\n\tmeasure 'Total Revenue' = SUM(Sales[Revenue])\n\t\tformatString: £#,##0\n\tmeasure 'Order Count' = COUNTROWS(Sales)\n",
+ 'Retail.SemanticModel/definition/tables/Products.tmdl':"table Products\n\tcolumn Category\n\t\tdataType: string\n\tcolumn ProductId\n\t\tdataType: int64\n",
+ 'Retail.SemanticModel/definition/relationships.tmdl':"relationship SalesToProducts\n\tfromColumn: Sales.ProductId\n\ttoColumn: Products.ProductId\n"
+ };return Object.entries(files).map(([name,content])=>({name,bytes:enc.encode(content)}))}
+export {inspectFiles,demoFiles};
 ,'m'));if(m)result.metadata.semanticModel[key]=m[1]};modelFormat=true}}
  for(const [id,page] of pageMap){page.ordinal=(pageOrder.indexOf(id)>=0?pageOrder.indexOf(id):1000+page.ordinal);result.pages.push(page)}result.pages.sort((a,b)=>a.ordinal-b.ordinal);
  for(const v of result.visuals){const p=pageMap.get(v.pageId)||result.pages.find(x=>x.id===v.pageId);if(p){v.page=p.name;p.visualCount++}else v.page=v.page||v.pageId||'Unmapped page'}
