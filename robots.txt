@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://powerbi-inspector.mightora.io/sitemap.xml

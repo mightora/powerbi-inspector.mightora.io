@@ -1,0 +1,10 @@
+import fs from 'node:fs/promises';
+import {makeZip} from '../zip.js';
+const html=await fs.readFile('downloads/power-bi-inspector-offline.html','utf8');
+const readme=await fs.readFile('downloads/README.md','utf8');
+const license=await fs.readFile('LICENSE','utf8');
+if(!html.includes('Offline Edition – No Internet Connection Required')||!html.includes("connect-src 'none'"))throw Error('Offline mode integrity check failed');
+if(html.includes('cdn.jsdelivr.net')||html.includes('src="./app.js"'))throw Error('Offline build references remote resources');
+const zip=makeZip([{name:'power-bi-inspector-offline.html',data:html},{name:'README.md',data:readme},{name:'LICENSE',data:license}]);
+await fs.writeFile('downloads/power-bi-inspector-offline.zip',new Uint8Array(await zip.arrayBuffer()));
+console.log('Offline ZIP generated from checked-in edition.');

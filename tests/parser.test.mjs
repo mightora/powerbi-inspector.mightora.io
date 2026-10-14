@@ -1,0 +1,13 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {inspectFiles,demoFiles} from '../parser.js';
+import {readZip,makeZip} from '../zip.js';
+import {toDocx,toHTML,toMarkdown,toCSV,csvZip} from '../exporter.js';
+const enc=new TextEncoder();
+const fixture=()=>inspectFiles(demoFiles());
+test('fixture inventories report and semantic model',()=>{const d=fixture();assert.equal(d.pages.length,2);assert.equal(d.visuals.length,3);assert.equal(d.tables.length,2);assert.equal(d.columns.length,4);assert.equal(d.measures.length,3);assert.equal(d.relationships.length,1);assert.equal(d.bookmarks.length,1);assert.equal(d.filters.length,2);assert.equal(d.format,'Enhanced PBIR');});
+test('model.bim model metadata',()=>{const d=inspectFiles([{name:'Data.SemanticModel/model.bim',bytes:enc.encode(JSON.stringify({model:{tables:[{name:'Products',columns:[{name:'Sku',dataType:'string'}],measures:[{name:'Count',expression:'COUNTROWS(Products)'}]}]}}))}]);assert.equal(d.tables.length,1);assert.equal(d.measures.length,1);});
+test('TMDL multiline DAX and inactive relationship',()=>{const d=inspectFiles([{name:'X.SemanticModel/definition/tables/Facts.tmdl',bytes:enc.encode("table 'Fact Sales'\n\tmeasure 'Net Amount' =\n\t\tSUM('Fact Sales'[Amount])\n")},{name:'X.SemanticModel/definition/relationships.tmdl',bytes:enc.encode("relationship r1\n\tisActive: false\n\tfromColumn: 'Fact Sales'.Key\n\ttoColumn: 'Date'.Key\n")}]);assert.equal(d.measures[0].name,'Net Amount');assert.equal(d.relationships[0].isActive,false);});
+test('legacy report visuals',()=>{const j={sections:[{name:'one',displayName:'Summary',visualContainers:[{config:JSON.stringify({name:'v1',singleVisual:{visualType:'tableEx'}})}]}]};const d=inspectFiles([{name:'Demo.Report/report.json',bytes:enc.encode(JSON.stringify(j))}]);assert.equal(d.visuals[0].type,'tableEx');});
+test('ZIP import/export and path safety',async()=>{const f=await readZip(await makeZip([{name:'f.txt',data:'Résumé 👌'}]).arrayBuffer());assert.equal(new TextDecoder().decode(f[0].bytes),'Résumé 👌');assert.throws(()=>makeZip([{name:'../secret',data:'a'}]),/Unsafe/);});
+test('all documentation formats including editable Word',async()=>{const d=fixture();assert.match(toMarkdown(d),/Total Revenue/);assert.match(toHTML(d),/Sales overview/);assert.match(toCSV(d,'measures'),/Total Revenue/);assert.equal((await readZip(await csvZip(d).arrayBuffer())).length,10);const w=await readZip(await toDocx(d).arrayBuffer());assert(w.some(x=>x.name==='word/document.xml'));});
+test('unrecognised input reported',()=>{const d=inspectFiles([{name:'notes.txt',bytes:enc.encode('hi')}]);assert.equal(d.tables.length,0);assert(d.issues.length>0)});

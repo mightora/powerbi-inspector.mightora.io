@@ -1,0 +1,16 @@
+{
+  "name": "mightora-power-bi-report-inspector",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Local-first Power BI report inspector",
+  "scripts": {
+    "test": "node --test",
+    "build": "node scripts/package.mjs",
+    "check": "npm test && npm run build"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT"
+}
