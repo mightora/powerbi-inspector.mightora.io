@@ -67,4 +67,15 @@
 </section>
 <mightora-footer><div class="container fallback-footer"><div><strong>Mightora</strong> · Free developer tools</div><div>Report Inspector by <a href="https://mightora.io">Mightora</a> · <a href="https://github.com/mightora/powerbi-inspector.mightora.io">Source on GitHub</a></div></div></mightora-footer>
 <script type="module" src="./app.js"></script>
+
+<!-- Cloudflare Web Analytics: production only; no network traffic when opened locally/offline -->
+<script>
+  if (window.location.hostname === 'powerbi-inspector.mightora.io') {
+    const analyticsBeacon = document.createElement('script');
+    analyticsBeacon.src = 'https://static.cloudflareinsights.com/beacon.min.js';
+    analyticsBeacon.defer = true;
+    analyticsBeacon.setAttribute('data-cf-beacon', '{"token":"54355574b7594d3d9d9946038d33925a","spa":true}');
+    document.head.appendChild(analyticsBeacon);
+  }
+</script>
 </body></html>
