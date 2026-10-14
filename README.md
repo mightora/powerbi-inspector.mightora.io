@@ -32,3 +32,7 @@ Evidence: [Tests](https://github.com/mightora/powerbi-inspector.mightora.io/acti
 Online visits load third-party resources needed for Mightora branding (CDN/js-yaml/logo/author images). User-selected project content is not transmitted by the app. Offline mode embeds assets and sets CSP `connect-src 'none'`, with no app-originated network requirements. On-screen Resource Timing is not a full security monitor.
 
 Copyright © 2026 Mightora. MIT licensed.
+
+## Live quality badges
+
+The site shows official GitHub Actions branch-status images for the real `ci.yml`, `codeql.yml` and `pages.yml` workflows on `main`, and Shields.io badges derived from GitHub's licence and last-commit metadata. Each badge links to the workflow, licence or source history itself. Workflow badges update based on GitHub; a passing badge only represents that workflow's latest status, not an external security certification. The online page requests these images from GitHub and Shields.io, without including any local Power BI project data. The offline edition does not request badge images and instead presents optional evidence links.
